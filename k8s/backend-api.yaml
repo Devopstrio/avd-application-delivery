@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avd-api-gateway
+  namespace: avd-platform-prod
+  labels:
+    app: avd-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: avd-api
+  template:
+    metadata:
+      labels:
+        app: avd-api
+    spec:
+      containers:
+        - name: fastapi-server
+          image: acrdevopstrio.azurecr.io/avd-api:v1.2.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: avd-secrets
+                  key: tenant-id
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: avd-api-svc
+  namespace: avd-platform-prod
+spec:
+  selector:
+    app: avd-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avd-autoscale-engine
+  namespace: avd-platform-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autoscale
+  template:
+    metadata:
+      labels:
+        app: autoscale
+    spec:
+      containers:
+        - name: scaler
+          image: acrdevopstrio.azurecr.io/avd-autoscale:latest
+          env:
+            - name: SCALE_MAX_SESSIONS
+              value: "15"
